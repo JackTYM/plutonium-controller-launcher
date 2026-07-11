@@ -58,6 +58,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v${{ steps.bump.outputs.version }}" \
-            target/release/plutonium-launcher.exe \
+            target/release/plutonium.exe \
             --title "v${{ steps.bump.outputs.version }}" \
             --generate-notes

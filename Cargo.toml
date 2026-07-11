@@ -23,5 +23,5 @@ windows = { version = "0.58", features = [
 ] }
 
 [[bin]]
-name = "plutonium-launcher"
+name = "plutonium"
 path = "src/main.rs"
