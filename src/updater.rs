@@ -41,8 +41,8 @@ impl Updater {
         self
     }
 
-    /// Full update + launch sequence.
-    pub fn run(&self) -> Result<()> {
+    /// Full update + launch sequence. Returns the launched process's PID.
+    pub fn run(&self) -> Result<u32> {
         let prod = self.fetch_prod_json()?;
         let (files, info_list) = self.fetch_manifests(&prod)?;
 
@@ -58,8 +58,7 @@ impl Updater {
         let launch_target = prod.launch_target.clone();
         self.write_info_cache(total_revision, &launch_target)?;
 
-        self.launch(&launch_target)?;
-        Ok(())
+        self.launch(&launch_target)
     }
 
     /// Sync only; don't launch.  Used by --update-only mode.
@@ -74,8 +73,9 @@ impl Updater {
         Ok(())
     }
 
-    /// Launch only (no network).  Used by --no-update mode.
-    pub fn launch_only(&self) -> Result<()> {
+    /// Launch only (no network).  Used by --no-update mode. Returns the
+    /// launched process's PID.
+    pub fn launch_only(&self) -> Result<u32> {
         // Re-write our patched files in case they were clobbered by another tool.
         // We need the original HTML for injection; read what's on disk (may be
         // patched already — inject_script_tag is idempotent, so that's fine).
@@ -227,17 +227,21 @@ impl Updater {
             .with_context(|| format!("write {}", path.display()))
     }
 
-    fn launch(&self, launch_target: &str) -> Result<()> {
+    /// Spawn the launcher target and return its PID. The gamepad helper needs
+    /// this to target our specific window (by owning process), rather than
+    /// guessing via window class name alone — which is ambiguous when
+    /// multiple instances run simultaneously (e.g. PartyDeck split-screen).
+    fn launch(&self, launch_target: &str) -> Result<u32> {
         let target = self.install_dir.join(launch_target);
         if !target.exists() {
             bail!("launch target not found: {}", target.display());
         }
         println!("Launching {}", target.display());
-        Command::new(&target)
+        let child = Command::new(&target)
             .current_dir(&self.install_dir)
             .spawn()
             .with_context(|| format!("spawn {}", target.display()))?;
-        Ok(())
+        Ok(child.id())
     }
 }
 

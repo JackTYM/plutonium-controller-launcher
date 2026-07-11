@@ -42,10 +42,14 @@ fn run() -> Result<()> {
 
     let upd = Updater::new(install_dir).with_fast_verify(!full_verify);
 
-    if no_update {
+    // PID of the spawned launcher process. Needed (not just cosmetic) so the
+    // gamepad helper can target our specific window and so we know exactly
+    // when *our* instance closes — both matter under PartyDeck, where several
+    // simultaneous instances can share the same process name and window class.
+    let ui_pid = if no_update {
         // Fast path: re-apply patch and launch; no network.
         println!("Skipping update (--no-update).");
-        upd.launch_only()?;
+        upd.launch_only()?
     } else if update_only {
         println!("Updating (--update-only, no launch).");
         upd.sync()?;
@@ -53,39 +57,39 @@ fn run() -> Result<()> {
         return Ok(());
     } else {
         // Default: update + patch + launch.
-        upd.run()?;
-    }
+        upd.run()?
+    };
 
     // Spawn the controller helper as a resident background thread.
     // It exits when `stop` is set, which we set when the launcher process is gone.
     let stop = Arc::new(AtomicBool::new(false));
     let helper_stop = stop.clone();
-    let _helper = gamepad::spawn_controller_helper(helper_stop);
+    let _helper = gamepad::spawn_controller_helper(ui_pid, helper_stop);
 
     // Keep this process alive until the launcher exits.
-    wait_for_launcher();
+    wait_for_launcher(ui_pid);
 
     stop.store(true, Ordering::Relaxed);
     Ok(())
 }
 
-/// Block until the Plutonium launcher process is no longer running.
-fn wait_for_launcher() {
+/// Block until the launcher process (by PID) is no longer running.
+fn wait_for_launcher(ui_pid: u32) {
     use std::time::Duration;
     use std::thread;
 
     println!("Waiting for launcher to close…");
     loop {
         thread::sleep(Duration::from_secs(2));
-        if !launcher_is_running() {
+        if !process_is_running(ui_pid) {
             println!("Launcher closed. Exiting.");
             break;
         }
     }
 }
 
-/// Returns true if any process named `plutonium-launcher-win32.exe` is running.
-fn launcher_is_running() -> bool {
+/// Returns true if a process with the given PID currently exists.
+fn process_is_running(pid: u32) -> bool {
     #[cfg(windows)]
     {
         use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -105,16 +109,12 @@ fn launcher_is_running() -> bool {
                 ..Default::default()
             };
 
+            let mut found = false;
             if Process32FirstW(snap, &mut entry).is_ok() {
                 loop {
-                    let name: String = entry.szExeFile
-                        .iter()
-                        .take_while(|&&c| c != 0)
-                        .map(|&c| c as u8 as char)
-                        .collect();
-                    if name.to_lowercase().contains("plutonium-launcher-win32") {
-                        let _: Result<(), _> = CloseHandle(snap);
-                        return true;
+                    if entry.th32ProcessID == pid {
+                        found = true;
+                        break;
                     }
                     if Process32NextW(snap, &mut entry).is_err() {
                         break;
@@ -122,11 +122,12 @@ fn launcher_is_running() -> bool {
                 }
             }
             let _: Result<(), _> = CloseHandle(snap);
-            false
+            found
         }
     }
     #[cfg(not(windows))]
     {
+        let _ = pid;
         false
     }
 }
