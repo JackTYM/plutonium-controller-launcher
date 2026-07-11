@@ -29,7 +29,7 @@ plutonium.exe [OPTIONS]
 | *(none)* | Update all files, write patched `index.html`, launch, run the controller helper. |
 | `--no-update` | Skip the update/sync step and just re-patch + launch (fast path for repeated launches, e.g. one PartyDeck instance per player). |
 | `--update-only` | Update + patch but don't launch (for pre-seeding an install). |
-| `--install-dir <path>` | Override the install directory (default: `%ProgramData%\Plutonium`). |
+| `--install-dir <path>` | Override the install directory (default: `%LOCALAPPDATA%\Plutonium`). |
 | `--full-verify` | Full SHA1 verification instead of the size-only default. |
 
 Controller mapping (while the launcher window is focused):

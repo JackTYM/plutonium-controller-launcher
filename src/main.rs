@@ -1,10 +1,12 @@
+#![windows_subsystem = "windows"]
+
 /// Plutonium controller launcher — entry point.
 ///
 /// Modes:
 ///   (default)      Update all files, write patched index.html, launch, run controller helper.
 ///   --no-update    Skip update step (PartyDeck: run once to update, then N times with this flag).
 ///   --update-only  Update + patch but don't launch (for pre-seeding the install).
-///   --install-dir <path>   Override the install directory (default: %ProgramData%\Plutonium).
+///   --install-dir <path>   Override the install directory (default: %LOCALAPPDATA%\Plutonium).
 ///   --full-verify  Full SHA1 check instead of size-only (slower, more thorough).
 ///                  Size-only is the default, matching stock Plutonium's fastVerify behavior.
 
@@ -142,9 +144,8 @@ fn parse_install_dir(args: &[String]) -> Result<PathBuf> {
         }
     }
 
-    // Default: %ProgramData%\Plutonium  (mirrors the stock updater)
-    let program_data = env::var("ProgramData")
-        .or_else(|_| env::var("PROGRAMDATA"))
-        .context("ProgramData env var not set")?;
-    Ok(PathBuf::from(program_data).join("Plutonium"))
+    // Default: %LOCALAPPDATA%\Plutonium  (mirrors the stock updater)
+    let local_app_data = env::var("LOCALAPPDATA")
+        .context("LOCALAPPDATA env var not set")?;
+    Ok(PathBuf::from(local_app_data).join("Plutonium"))
 }
